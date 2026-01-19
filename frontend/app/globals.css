@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      #1a1a2e,
+      #16213e,
+      #0f3460
+    );
+}
+
+@media (max-width: 768px) {
+  html, body {
+    overflow: auto;
+  }
+}
+
+@layer utilities {
+  .gradient-text {
+    @apply bg-gradient-to-r from-[#41D6CD] to-[#5D4FEA] bg-clip-text text-transparent;
+  }
+  
+  .gradient-bg {
+    @apply bg-gradient-to-r from-[#5D4FEA] to-[#41D6CD];
+  }
+  
+  .gradient-border {
+    @apply border-transparent bg-gradient-to-r from-[#5D4FEA] to-[#41D6CD] bg-clip-border;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
