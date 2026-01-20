@@ -3,6 +3,9 @@ node_modules/
 /.pnp
 .pnp.js
 
+# Lock files (using root workspace lockfile)
+package-lock.json
+
 # Testing
 /coverage
 
