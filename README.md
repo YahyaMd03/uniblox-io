@@ -57,7 +57,7 @@ frontend/
 
 The system implements a **global nth-order coupon engine** with the following rules:
 
-1. **Generation**: Every 5th order (n=5) automatically generates a new coupon code
+1. **Generation**: Every 3rd order (n=3) automatically generates a new coupon code
 2. **Uniqueness**: Only one active coupon exists at a time
 3. **Discount**: Coupons provide a 10% discount on the entire order
 4. **Single Use**: Each coupon can only be used once
@@ -305,7 +305,7 @@ Check server health.
 
 ### Business Logic
 
-- ✅ Automatic coupon generation every 5th order
+- ✅ Automatic coupon generation every 3rd order
 - ✅ Single active coupon at a time
 - ✅ Coupon validation and application
 - ✅ Automatic coupon invalidation after use

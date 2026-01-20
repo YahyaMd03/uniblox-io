@@ -53,6 +53,10 @@ export interface AdminStats {
   totalOrders: number;
 }
 
+export interface CouponResponse {
+  coupon: Coupon | null;
+}
+
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -99,6 +103,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ userId, couponCode }),
     });
+  },
+
+  // Coupon
+  getActiveCoupon: async (): Promise<CouponResponse> => {
+    return fetchAPI('/coupon/active');
   },
 
   // Admin

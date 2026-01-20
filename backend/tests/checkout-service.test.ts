@@ -4,6 +4,8 @@
  * Tests checkout logic including coupon application and order creation
  */
 
+/// <reference types="jest" />
+
 import { checkoutService } from '../src/services/checkout-service';
 import { cartService } from '../src/services/cart-service';
 import { couponService } from '../src/services/coupon-service';
@@ -38,20 +40,21 @@ describe('CheckoutService', () => {
     });
 
     it('should apply valid coupon and calculate discount', () => {
-      // Generate a coupon
-      const coupon = couponService.generateNewCoupon(5);
+      // Generate a coupon using the new API
+      const coupon = couponService.maybeGenerateCoupon(3, 5);
+      expect(coupon).not.toBeNull();
       
       // Add items to cart
       cartService.addToCart('user2', '1', 1); // 1 laptop at 999.99
       
       const order = checkoutService.processCheckout({ 
         userId: 'user2', 
-        couponCode: coupon.code 
+        couponCode: coupon!.code 
       });
       
       expect(order.discount).toBe(99.999); // 10% of 999.99
       expect(order.total).toBe(899.991); // 999.99 - 99.999
-      expect(order.couponCode).toBe(coupon.code);
+      expect(order.couponCode).toBe(coupon!.code);
     });
 
     it('should throw error for invalid coupon', () => {
@@ -65,17 +68,17 @@ describe('CheckoutService', () => {
       }).toThrow('Invalid or expired coupon code');
     });
 
-    it('should generate new coupon on nth order', () => {
-      // Clear any existing coupons
-      const initialOrderCount = store.getGlobalOrderCount();
+    it('should generate new coupon when ordersSinceLastCouponUse reaches 3', () => {
+      // Reset the counter to start fresh
+      store.resetOrdersSinceLastCouponUse();
       
-      // Add items and checkout 5 times to trigger coupon generation
-      for (let i = 0; i < 5; i++) {
+      // Add items and checkout 3 times to trigger coupon generation (NTH_ORDER = 3)
+      for (let i = 0; i < 3; i++) {
         cartService.addToCart(`user${i}`, '2', 1); // Add mouse
         checkoutService.processCheckout({ userId: `user${i}` });
       }
       
-      // Check if coupon was generated
+      // Check if coupon was generated after 3rd order
       const activeCoupon = couponService.getActiveCoupon();
       expect(activeCoupon).not.toBeNull();
       expect(activeCoupon?.isValid).toBe(true);

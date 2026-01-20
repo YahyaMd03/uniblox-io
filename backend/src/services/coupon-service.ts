@@ -1,136 +1,127 @@
 /**
  * Coupon Service - Manages coupon generation and validation
  * 
- * Business Rules:
- * - Every nth order (n=5) generates a new coupon
+ * Business Rules (rolling counter):
+ * - Use NTH_ORDER = 3
+ * - Maintain ordersSinceLastCouponUse counter
+ * - On every checkout:
+ *   1. Increment globalOrderCount
+ *   2. Increment ordersSinceLastCouponUse
+ *   3. If ordersSinceLastCouponUse === NTH_ORDER, generate a new coupon
+ * - When a coupon is successfully applied:
+ *   - Mark it as used
+ *   - Reset ordersSinceLastCouponUse = 0
+ * - If a coupon is not used, the counter does not reset
  * - Only one active coupon exists at a time
- * - Coupons provide 10% discount
- * - Coupons can only be used once
- * - Coupons become invalid after use
+ * - A coupon:
+ *   - Applies to the entire order
+ *   - Is valid only once
+ *   - Becomes invalid immediately after use
  */
 
 import { Coupon } from '../models/types';
 import { store } from '../store/memory-store';
 
-const NTH_ORDER = 5;
+const NTH_ORDER = 3;
 const DISCOUNT_PERCENT = 10;
 
 export class CouponService {
-  /**
-   * Generate a deterministic coupon code
-   * Format: SAVE10-XXXX where XXXX is a 4-character alphanumeric code
-   * 
-   * @param orderCount - The global order count used to generate deterministic code
-   */
-  private generateCouponCode(orderCount: number): string {
-    // Deterministic generation based on order count
-    // This ensures the same order count always generates the same code
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = 'SAVE10-';
-    
-    // Use order count as seed for deterministic generation
-    let seed = orderCount * 17 + 42; // Simple hash-like function
-    
-    for (let i = 0; i < 4; i++) {
-      code += chars[seed % chars.length];
-      seed = Math.floor(seed / chars.length) + i * 7;
-    }
-    
-    return code;
-  }
+    /**
+     * Generate a deterministic coupon code
+     * Format: SAVE10-XXXX where XXXX is a 4-character alphanumeric code
+     * 
+     * @param orderCount - The global order count used to generate deterministic code
+     */
+    private generateCouponCode(orderCount: number): string {
+        // Deterministic generation based on order count
+        // This ensures the same order count always generates the same code
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = 'SAVE10-';
 
-  /**
-   * Check if a new coupon should be generated based on order count
-   * 
-   * @param orderCount - Current global order count
-   */
-  shouldGenerateCoupon(orderCount: number): boolean {
-    return orderCount > 0 && orderCount % NTH_ORDER === 0;
-  }
+        // Use order count as seed for deterministic generation
+        let seed = orderCount * 17 + 42; // Simple hash-like function
 
-  /**
-   * Generate a new coupon and invalidate any existing active coupon
-   * 
-   * @param orderCount - Current global order count (used for deterministic code generation)
-   * @param customCode - Optional custom coupon code (admin override)
-   */
-  generateNewCoupon(orderCount: number, customCode?: string): Coupon {
-    // Invalidate any existing active coupon
-    const activeCoupon = store.getActiveCoupon();
-    if (activeCoupon) {
-      activeCoupon.isValid = false;
+        for (let i = 0; i < 4; i++) {
+            code += chars[seed % chars.length];
+            seed = Math.floor(seed / chars.length) + i * 7;
+        }
+
+        return code;
     }
 
-    // Use custom code if provided, otherwise generate deterministically
-    const code = customCode || this.generateCouponCode(orderCount);
-    
-    // Validate code format (optional: ensure it follows pattern)
-    if (code.length < 3) {
-      throw new Error('Coupon code must be at least 3 characters long');
+    /**
+     * Generate a new coupon if ordersSinceLastCouponUse === NTH_ORDER.
+     * This is called during checkout after incrementing ordersSinceLastCouponUse.
+     * 
+     * Rolling counter logic: Coupons appear after every N orders since the last coupon was used.
+     * 
+     * @param ordersSinceLastCouponUse - The current count of orders since last coupon use (already incremented)
+     * @param globalOrderCount - The global order count (for deterministic code generation)
+     * @returns The generated coupon, or null if no coupon should be generated
+     */
+    maybeGenerateCoupon(ordersSinceLastCouponUse: number, globalOrderCount: number): Coupon | null {
+        // Generate coupon only when ordersSinceLastCouponUse === NTH_ORDER
+        if (ordersSinceLastCouponUse !== NTH_ORDER) {
+            return null;
+        }
+
+        // Per assignment: "Only one active coupon exists at a time"
+        // Invalidate any existing active coupon before creating a new one
+        const activeCoupon = store.getActiveCoupon();
+        if (activeCoupon) {
+            activeCoupon.isValid = false;
+        }
+
+        // Generate deterministic coupon code based on global order count
+        const code = this.generateCouponCode(globalOrderCount);
+
+        const coupon: Coupon = {
+            code: code.toUpperCase(),
+            discountPercent: DISCOUNT_PERCENT,
+            createdAt: new Date(),
+            isValid: true,
+        };
+
+        store.addCoupon(coupon);
+        return coupon;
     }
 
-    const coupon: Coupon = {
-      code: code.toUpperCase(),
-      discountPercent: DISCOUNT_PERCENT,
-      createdAt: new Date(),
-      isValid: true,
-    };
+    /**
+     * Validate a coupon code.
+     * Per assignment: "A coupon is valid only once" and "becomes invalid immediately after use"
+     * 
+     * @param code - Coupon code to validate
+     * @returns Validation result with valid flag and discount percent
+     */
+    validateCoupon(code: string): { valid: boolean; discountPercent: number } {
+        const coupon = store.getAllCoupons().find(c => c.code === code && c.isValid);
 
-    store.addCoupon(coupon);
-    return coupon;
-  }
+        if (!coupon) {
+            return { valid: false, discountPercent: 0 };
+        }
 
-  /**
-   * Validate a coupon code
-   * 
-   * @param code - Coupon code to validate
-   */
-  validateCoupon(code: string): { valid: boolean; discountPercent: number } {
-    const coupon = store.getAllCoupons().find(c => c.code === code && c.isValid);
-    
-    if (!coupon) {
-      return { valid: false, discountPercent: 0 };
+        return { valid: true, discountPercent: coupon.discountPercent };
     }
 
-    return { valid: true, discountPercent: coupon.discountPercent };
-  }
+    /**
+     * Apply a coupon (marks it as used).
+     * Per assignment: "A coupon becomes invalid immediately after use"
+     * 
+     * @param code - Coupon code to apply
+     */
+    applyCoupon(code: string): void {
+        store.markCouponAsUsed(code);
+    }
 
-  /**
-   * Apply a coupon (marks it as used)
-   * 
-   * @param code - Coupon code to apply
-   */
-  applyCoupon(code: string): boolean {
-    return store.markCouponAsUsed(code);
-  }
-
-  /**
-   * Get the active coupon (if any)
-   */
-  getActiveCoupon(): Coupon | null {
-    return store.getActiveCoupon();
-  }
-
-  /**
-   * Get all coupons (for admin)
-   */
-  getAllCoupons(): Coupon[] {
-    return store.getAllCoupons();
-  }
-
-  /**
-   * Get the nth order value
-   */
-  getNthOrder(): number {
-    return NTH_ORDER;
-  }
-
-  /**
-   * Get the discount percent
-   */
-  getDiscountPercent(): number {
-    return DISCOUNT_PERCENT;
-  }
+    /**
+     * Get the active coupon (if any).
+     * Per assignment: "Only one active coupon exists at a time"
+     * 
+     * @returns The active coupon, or null if none exists
+     */
+    getActiveCoupon(): Coupon | null {
+        return store.getActiveCoupon();
+    }
 }
 
 export const couponService = new CouponService();

@@ -12,6 +12,18 @@ export default function AdminPage() {
   const [generating, setGenerating] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyToClipboard = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to copy to clipboard' });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
 
   useEffect(() => {
     loadStats();
@@ -176,10 +188,27 @@ export default function AdminPage() {
           {stats.activeCoupon ? (
             <div className="bg-gradient-uniblox/20 border border-uniblox-teal/50 rounded-lg p-4">
               <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-lg font-bold text-white">
-                    {stats.activeCoupon.code}
-                  </p>
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-lg font-bold text-white">
+                      {stats.activeCoupon.code}
+                    </p>
+                    <button
+                      onClick={() => copyToClipboard(stats.activeCoupon!.code)}
+                      className="p-1.5 hover:bg-white/10 rounded transition-colors group"
+                      title="Copy to clipboard"
+                    >
+                      {copiedCode === stats.activeCoupon.code ? (
+                        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-gray-400 group-hover:text-uniblox-teal transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                   <p className="text-sm text-uniblox-teal">
                     {stats.activeCoupon.discountPercent}% discount
                   </p>
@@ -229,7 +258,24 @@ export default function AdminPage() {
                     {stats.allCoupons.map((coupon, index) => (
                       <tr key={index} className="hover:bg-gray-700/30 transition-colors">
                         <td className="px-3 lg:px-4 py-2 whitespace-nowrap text-xs lg:text-sm font-medium text-white">
-                          {coupon.code}
+                          <div className="flex items-center space-x-2">
+                            <span>{coupon.code}</span>
+                            <button
+                              onClick={() => copyToClipboard(coupon.code)}
+                              className="p-1 hover:bg-white/10 rounded transition-colors group"
+                              title="Copy to clipboard"
+                            >
+                              {copiedCode === coupon.code ? (
+                                <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5 text-gray-500 group-hover:text-uniblox-teal transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
                         </td>
                         <td className="px-3 lg:px-4 py-2 whitespace-nowrap text-xs lg:text-sm text-gray-400">
                           {coupon.discountPercent}%

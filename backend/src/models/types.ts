@@ -63,3 +63,10 @@ export interface AdminStats {
   allCoupons: Coupon[];
   totalOrders: number;
 }
+
+export interface CouponRequestResponse {
+  coupon: Coupon | null;
+  nextAvailableAtOrder: number | null;
+  currentOrderCount?: number;
+  message?: string;
+}

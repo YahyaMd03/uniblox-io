@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/lib/context';
-import { api, Cart, Order } from '@/lib/api';
+import { api, Cart, Order, CouponResponse } from '@/lib/api';
 import Nav from '../components/Nav';
 
 export default function CartPage() {
@@ -15,51 +15,46 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
   const [couponCode, setCouponCode] = useState('');
-  const [couponValid, setCouponValid] = useState<boolean | null>(null);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [orderResult, setOrderResult] = useState<{ order: Order; message: string } | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [loadingCoupon, setLoadingCoupon] = useState(false);
+  const [activeCoupon, setActiveCoupon] = useState<CouponResponse | null>(null);
+  const [couponApplied, setCouponApplied] = useState(false);
+
+  const copyToClipboard = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to copy to clipboard' });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
 
   useEffect(() => {
     if (userId) {
       loadCart();
+      loadActiveCoupon();
     }
   }, [userId]);
 
-  // Validate coupon when code changes
-  useEffect(() => {
-    if (!couponCode.trim()) {
-      setCouponValid(null);
-      return;
+  const loadActiveCoupon = async () => {
+    setLoadingCoupon(true);
+    try {
+      const response = await api.getActiveCoupon();
+      setActiveCoupon(response);
+      // Don't auto-apply - user must click "Apply Coupon" button
+    } catch (error) {
+      // Silently fail - coupon is optional
+      setActiveCoupon(null);
+    } finally {
+      setLoadingCoupon(false);
     }
+  };
 
-    const validateCouponCode = async () => {
-      setValidatingCoupon(true);
-      try {
-        const validation = await api.validateCoupon(couponCode.trim());
-        setCouponValid(validation.valid);
-        if (!validation.valid) {
-          setMessage({ type: 'error', text: 'Invalid or expired coupon code' });
-          setTimeout(() => setMessage(null), 3000);
-        } else {
-          setMessage(null);
-        }
-      } catch (error) {
-        setCouponValid(false);
-        setMessage({ 
-          type: 'error', 
-          text: error instanceof Error ? error.message : 'Failed to validate coupon' 
-        });
-        setTimeout(() => setMessage(null), 3000);
-      } finally {
-        setValidatingCoupon(false);
-      }
-    };
-
-    // Debounce validation
-    const timeoutId = setTimeout(validateCouponCode, 500);
-    return () => clearTimeout(timeoutId);
-  }, [couponCode]);
 
   const loadCart = async () => {
     if (!userId) return;
@@ -78,6 +73,48 @@ export default function CartPage() {
     }
   };
 
+  const handleApplyCoupon = async () => {
+    if (!activeCoupon?.coupon) {
+      setMessage({ type: 'error', text: 'Coupon code not available' });
+      setTimeout(() => setMessage(null), 3000);
+      return;
+    }
+
+    // Validate the coupon
+    setValidatingCoupon(true);
+    try {
+      const validation = await api.validateCoupon(activeCoupon.coupon.code);
+      if (validation.valid) {
+        setCouponCode(activeCoupon.coupon.code);
+        setCouponApplied(true);
+        setMessage({ type: 'success', text: 'Coupon applied successfully!' });
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setCouponApplied(false);
+        setCouponCode('');
+        setMessage({ type: 'error', text: 'Coupon code not available' });
+        setTimeout(() => setMessage(null), 3000);
+      }
+    } catch (error) {
+      setCouponApplied(false);
+      setCouponCode('');
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to apply coupon',
+      });
+      setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode('');
+    setCouponApplied(false);
+    setMessage({ type: 'success', text: 'Coupon removed' });
+    setTimeout(() => setMessage(null), 2000);
+  };
+
   const handleCheckout = async () => {
     if (!userId || !cart || cart.items.length === 0) {
       setMessage({ type: 'error', text: 'Cart is empty' });
@@ -88,15 +125,12 @@ export default function CartPage() {
     setMessage(null);
 
     try {
-      const response = await api.checkout(userId, couponCode || undefined);
+      const response = await api.checkout(userId, couponApplied && couponCode ? couponCode : undefined);
       setOrderResult(response);
       setCart(null);
       setCouponCode('');
-      
-      // Redirect to home after 5 seconds
-      setTimeout(() => {
-        router.push('/');
-      }, 5000);
+      setCouponApplied(false);
+      setActiveCoupon(null);
     } catch (error) {
       setMessage({
         type: 'error',
@@ -161,9 +195,26 @@ export default function CartPage() {
                 </div>
                 {couponUsed && (
                   <>
-                    <div className="flex justify-between text-sm text-uniblox-teal">
+                    <div className="flex justify-between items-center text-sm text-uniblox-teal">
                       <span>Coupon Code:</span>
-                      <span className="font-semibold">{order.couponCode}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold">{order.couponCode}</span>
+                        <button
+                          onClick={() => copyToClipboard(order.couponCode!)}
+                          className="p-1 hover:bg-white/10 rounded transition-colors group"
+                          title="Copy to clipboard"
+                        >
+                          {copiedCode === order.couponCode ? (
+                            <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-uniblox-teal/70 group-hover:text-uniblox-teal transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div className="flex justify-between text-sm text-uniblox-teal">
                       <span>Discount Applied:</span>
@@ -197,10 +248,9 @@ export default function CartPage() {
             </div>
 
             <div className="text-center">
-              <p className="text-gray-400 text-sm mb-4">Redirecting to products page in a few seconds...</p>
               <button
                 onClick={() => router.push('/')}
-                className="px-6 py-3 bg-gradient-uniblox text-white rounded-lg hover:shadow-lg hover:shadow-uniblox-purple/50 transition-all"
+                className="px-6 py-3 bg-gradient-uniblox text-white rounded-lg hover:shadow-lg hover:shadow-uniblox-purple/50 transition-all font-medium"
               >
                 Continue Shopping
               </button>
@@ -332,16 +382,59 @@ export default function CartPage() {
 
               <div className="mt-4 pt-4 border-t border-gray-700/50">
                 <div className="mb-3">
-                  <label className="block text-xs lg:text-sm font-medium text-gray-300 mb-1.5">
-                    Coupon Code (optional)
+                  <label className="block text-xs lg:text-sm font-medium text-gray-300 mb-2">
+                    Coupon
                   </label>
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="Enter coupon code"
-                    className="w-full px-3 py-2 text-sm bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-uniblox-teal focus:border-transparent"
-                  />
+                  
+                  {/* Display active coupon with apply button */}
+                  {loadingCoupon ? (
+                    <div className="p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-center">
+                      <p className="text-xs text-gray-400">Loading coupon...</p>
+                    </div>
+                  ) : activeCoupon?.coupon ? (
+                    <div className="space-y-2">
+                      <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                        couponApplied 
+                          ? 'bg-green-500/10 border-green-500/30' 
+                          : 'bg-gray-900/50 border-gray-700'
+                      }`}>
+                        <div className="flex items-center space-x-2 flex-1">
+                          <span className={`text-sm font-semibold ${
+                            couponApplied ? 'text-green-400' : 'text-gray-300'
+                          }`}>
+                            {activeCoupon.coupon.code}
+                          </span>
+                          {couponApplied && (
+                            <span className="text-xs text-green-400">(10% off)</span>
+                          )}
+                        </div>
+                        {couponApplied ? (
+                          <button
+                            onClick={handleRemoveCoupon}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/50 transition-all"
+                          >
+                            Remove
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleApplyCoupon}
+                            disabled={validatingCoupon}
+                            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
+                              validatingCoupon
+                                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                : 'bg-uniblox-teal/20 text-uniblox-teal hover:bg-uniblox-teal/30 border border-uniblox-teal/50'
+                            }`}
+                          >
+                            {validatingCoupon ? 'Applying...' : 'Apply Coupon'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-gray-900/50 border border-gray-700 rounded-lg text-center">
+                      <p className="text-xs text-gray-400">Coupon code not available</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 mb-4">
@@ -349,26 +442,16 @@ export default function CartPage() {
                     <span>Subtotal:</span>
                     <span>${subtotal.toFixed(2)}</span>
                   </div>
-                  {couponCode && couponValid === true && (
+                  {couponApplied && couponCode && (
                     <div className="flex justify-between text-sm text-uniblox-teal">
                       <span>Discount (10%):</span>
                       <span>-${(subtotal * 0.1).toFixed(2)}</span>
                     </div>
                   )}
-                  {couponCode && couponValid === false && (
-                    <div className="text-xs text-red-400 mt-1">
-                      Invalid or expired coupon code
-                    </div>
-                  )}
-                  {couponCode && validatingCoupon && (
-                    <div className="text-xs text-gray-400 mt-1">
-                      Validating coupon...
-                    </div>
-                  )}
                   <div className="flex justify-between text-lg lg:text-xl font-bold text-white pt-2 border-t border-gray-700/50">
                     <span>Total:</span>
                     <span className="gradient-text">
-                      ${(couponCode && couponValid === true ? subtotal * 0.9 : subtotal).toFixed(2)}
+                      ${(couponApplied && couponCode ? subtotal * 0.9 : subtotal).toFixed(2)}
                     </span>
                   </div>
                 </div>

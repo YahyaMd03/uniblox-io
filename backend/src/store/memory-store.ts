@@ -15,6 +15,7 @@ export class MemoryStore {
   private orders: Order[] = [];
   private coupons: Coupon[] = [];
   private globalOrderCount: number = 0;
+  private ordersSinceLastCouponUse: number = 0;
 
   // Cart operations
   getCart(userId: string): Cart | undefined {
@@ -32,7 +33,8 @@ export class MemoryStore {
   // Order operations
   createOrder(order: Order): void {
     this.orders.push(order);
-    this.globalOrderCount++;
+    // Note: globalOrderCount is incremented separately in checkout service
+    // before coupon generation check, per assignment requirements
   }
 
   getAllOrders(): Order[] {
@@ -41,6 +43,22 @@ export class MemoryStore {
 
   getGlobalOrderCount(): number {
     return this.globalOrderCount;
+  }
+
+  incrementGlobalOrderCount(): void {
+    this.globalOrderCount++;
+  }
+
+  getOrdersSinceLastCouponUse(): number {
+    return this.ordersSinceLastCouponUse;
+  }
+
+  incrementOrdersSinceLastCouponUse(): void {
+    this.ordersSinceLastCouponUse++;
+  }
+
+  resetOrdersSinceLastCouponUse(): void {
+    this.ordersSinceLastCouponUse = 0;
   }
 
   // Coupon operations
@@ -57,14 +75,12 @@ export class MemoryStore {
     return [...this.coupons];
   }
 
-  markCouponAsUsed(code: string): boolean {
+  markCouponAsUsed(code: string): void {
     const coupon = this.coupons.find(c => c.code === code && c.isValid);
     if (coupon) {
       coupon.isValid = false;
       coupon.usedAt = new Date();
-      return true;
     }
-    return false;
   }
 
   // Statistics
