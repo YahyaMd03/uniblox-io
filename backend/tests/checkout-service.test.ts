@@ -41,7 +41,7 @@ describe('CheckoutService', () => {
 
     it('should apply valid coupon and calculate discount', () => {
       // Generate a coupon using the new API
-      const coupon = couponService.maybeGenerateCoupon(3, 5);
+      const coupon = couponService.maybeGenerateCoupon(4, 5);
       expect(coupon).not.toBeNull();
       
       // Add items to cart
@@ -68,17 +68,17 @@ describe('CheckoutService', () => {
       }).toThrow('Invalid or expired coupon code');
     });
 
-    it('should generate new coupon when ordersSinceLastCouponUse reaches 3', () => {
+    it('should generate new coupon when ordersSinceLastCouponUse reaches 4', () => {
       // Reset the counter to start fresh
       store.resetOrdersSinceLastCouponUse();
       
-      // Add items and checkout 3 times to trigger coupon generation (NTH_ORDER = 3)
-      for (let i = 0; i < 3; i++) {
+      // Add items and checkout 4 times to trigger coupon generation (NTH_ORDER = 4)
+      for (let i = 0; i < 4; i++) {
         cartService.addToCart(`user${i}`, '2', 1); // Add mouse
         checkoutService.processCheckout({ userId: `user${i}` });
       }
       
-      // Check if coupon was generated after 3rd order
+      // Check if coupon was generated after 4th order
       const activeCoupon = couponService.getActiveCoupon();
       expect(activeCoupon).not.toBeNull();
       expect(activeCoupon?.isValid).toBe(true);

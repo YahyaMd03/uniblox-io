@@ -27,6 +27,12 @@ const DISCOUNT_PERCENT = 10;
 
 export class CouponService {
     /**
+     * Get the NTH_ORDER value (for use in checkout service)
+     */
+    getNthOrder(): number {
+        return NTH_ORDER;
+    }
+    /**
      * Generate a deterministic coupon code
      * Format: SAVE10-XXXX where XXXX is a 4-character alphanumeric code
      * 
@@ -53,7 +59,7 @@ export class CouponService {
      * Generate a new coupon if ordersSinceLastCouponUse === NTH_ORDER.
      * This is called during checkout after incrementing ordersSinceLastCouponUse.
      * 
-     * Rolling counter logic: Coupons appear after every N orders since the last coupon was used.
+     * Rolling counter logic: Coupons appear ON the Nth order since the last coupon was used.
      * 
      * @param ordersSinceLastCouponUse - The current count of orders since last coupon use (already incremented)
      * @param globalOrderCount - The global order count (for deterministic code generation)
@@ -61,6 +67,7 @@ export class CouponService {
      */
     maybeGenerateCoupon(ordersSinceLastCouponUse: number, globalOrderCount: number): Coupon | null {
         // Generate coupon only when ordersSinceLastCouponUse === NTH_ORDER
+        // This means: coupon generated ON the Nth order (counter goes 0→1→2→3, generates on 3rd order when NTH_ORDER=3)
         if (ordersSinceLastCouponUse !== NTH_ORDER) {
             return null;
         }

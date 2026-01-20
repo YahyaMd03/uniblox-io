@@ -2,7 +2,7 @@
  * Unit tests for Coupon Service
  * 
  * Tests the rolling counter coupon generation logic and validation
- * Per assignment: NTH_ORDER = 3, coupon generated when ordersSinceLastCouponUse === 3
+ * Per assignment: NTH_ORDER = 4, coupon generated when ordersSinceLastCouponUse === 4
  */
 
 /// <reference types="jest" />
@@ -20,8 +20,8 @@ describe('CouponService', () => {
     });
 
     describe('maybeGenerateCoupon', () => {
-        it('should generate coupon when ordersSinceLastCouponUse is 3', () => {
-            const coupon = couponService.maybeGenerateCoupon(3, 3);
+        it('should generate coupon when ordersSinceLastCouponUse is 4', () => {
+            const coupon = couponService.maybeGenerateCoupon(4, 4);
 
             expect(coupon).not.toBeNull();
             expect(coupon!.code).toMatch(/^SAVE10-[A-Z0-9]{4}$/);
@@ -29,8 +29,8 @@ describe('CouponService', () => {
             expect(coupon!.isValid).toBe(true);
         });
 
-        it('should generate coupon when ordersSinceLastCouponUse is 3 (different globalOrderCount)', () => {
-            const coupon = couponService.maybeGenerateCoupon(3, 10);
+        it('should generate coupon when ordersSinceLastCouponUse is 4 (different globalOrderCount)', () => {
+            const coupon = couponService.maybeGenerateCoupon(4, 10);
 
             expect(coupon).not.toBeNull();
             expect(coupon!.discountPercent).toBe(10);
@@ -38,19 +38,19 @@ describe('CouponService', () => {
             expect(coupon!.code).toMatch(/^SAVE10-/);
         });
 
-        it('should return null when ordersSinceLastCouponUse is not 3', () => {
-            expect(couponService.maybeGenerateCoupon(4, 4)).toBeNull();
+        it('should return null when ordersSinceLastCouponUse is not 4', () => {
+            expect(couponService.maybeGenerateCoupon(3, 3)).toBeNull();
             expect(couponService.maybeGenerateCoupon(5, 5)).toBeNull();
             expect(couponService.maybeGenerateCoupon(1, 1)).toBeNull();
             expect(couponService.maybeGenerateCoupon(2, 2)).toBeNull();
         });
 
         it('should invalidate existing coupon when generating new one', () => {
-            const coupon1 = couponService.maybeGenerateCoupon(3, 3);
+            const coupon1 = couponService.maybeGenerateCoupon(4, 4);
             expect(coupon1).not.toBeNull();
             expect(coupon1!.isValid).toBe(true);
 
-            const coupon2 = couponService.maybeGenerateCoupon(3, 6);
+            const coupon2 = couponService.maybeGenerateCoupon(4, 8);
             expect(coupon2).not.toBeNull();
             expect(coupon2!.isValid).toBe(true);
 
@@ -62,7 +62,7 @@ describe('CouponService', () => {
 
     describe('validateCoupon', () => {
         it('should validate an active coupon', () => {
-            const coupon = couponService.maybeGenerateCoupon(3, 3);
+            const coupon = couponService.maybeGenerateCoupon(4, 4);
             expect(coupon).not.toBeNull();
 
             const validation = couponService.validateCoupon(coupon!.code);
@@ -71,7 +71,7 @@ describe('CouponService', () => {
         });
 
         it('should invalidate a used coupon', () => {
-            const coupon = couponService.maybeGenerateCoupon(3, 3);
+            const coupon = couponService.maybeGenerateCoupon(4, 4);
             expect(coupon).not.toBeNull();
 
             couponService.applyCoupon(coupon!.code);
@@ -88,7 +88,7 @@ describe('CouponService', () => {
 
     describe('applyCoupon', () => {
         it('should mark coupon as used (becomes invalid immediately after use)', () => {
-            const coupon = couponService.maybeGenerateCoupon(3, 3);
+            const coupon = couponService.maybeGenerateCoupon(4, 4);
             expect(coupon).not.toBeNull();
 
             couponService.applyCoupon(coupon!.code);
@@ -100,7 +100,7 @@ describe('CouponService', () => {
 
     describe('getActiveCoupon', () => {
         it('should return active coupon when one exists', () => {
-            const coupon = couponService.maybeGenerateCoupon(3, 3);
+            const coupon = couponService.maybeGenerateCoupon(4, 4);
             expect(coupon).not.toBeNull();
 
             const activeCoupon = couponService.getActiveCoupon();

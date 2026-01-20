@@ -69,15 +69,25 @@ export class CheckoutService {
         // Calculate total
         const total = subtotal - discount;
 
-        // On every checkout: Increment globalOrderCount and ordersSinceLastCouponUse
+        // On every checkout: Increment globalOrderCount
         store.incrementGlobalOrderCount();
-        store.incrementOrdersSinceLastCouponUse();
-
         const globalOrderCount = store.getGlobalOrderCount();
+
+        // Check if this will be the Nth order BEFORE incrementing
+        // This ensures coupon is generated ON the Nth order (not after N orders)
+        // Example: NTH_ORDER=3, counter=2 means next order (3rd) should generate coupon
+        const currentOrdersSinceLastCouponUse = store.getOrdersSinceLastCouponUse();
+        const nthOrder = couponService.getNthOrder();
+        const willBeNthOrder = (currentOrdersSinceLastCouponUse + 1) === nthOrder;
+
+        // Increment ordersSinceLastCouponUse
+        store.incrementOrdersSinceLastCouponUse();
         const ordersSinceLastCouponUse = store.getOrdersSinceLastCouponUse();
 
-        // If ordersSinceLastCouponUse === NTH_ORDER, generate a new coupon
-        couponService.maybeGenerateCoupon(ordersSinceLastCouponUse, globalOrderCount);
+        // If this is the Nth order, generate a new coupon
+        if (willBeNthOrder) {
+            couponService.maybeGenerateCoupon(ordersSinceLastCouponUse, globalOrderCount);
+        }
 
         // If coupon was successfully applied, reset the counter
         if (couponWasApplied) {
