@@ -7,7 +7,7 @@ A production-quality full-stack e-commerce application with an in-memory store, 
 This is a monorepo containing:
 
 - **Backend**: Node.js + Express + TypeScript with in-memory data store
-- **Frontend**: Next.js (App Router) + TypeScript + Tailwind CSS
+- **Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS
 
 ### Backend Structure
 
@@ -19,6 +19,7 @@ backend/
       cart-routes.ts
       checkout-routes.ts
       admin-routes.ts
+      coupon-routes.ts
     services/           # Business logic layer
       cart-service.ts
       checkout-service.ts
@@ -55,14 +56,15 @@ frontend/
 
 ## Coupon Logic
 
-The system implements a **global nth-order coupon engine** with the following rules:
+The system implements a **rolling counter coupon engine** with the following rules:
 
-1. **Generation**: Every 3rd order (n=3) automatically generates a new coupon code
+1. **Generation**: Every 4th order (n=4) automatically generates a new coupon code
 2. **Uniqueness**: Only one active coupon exists at a time
 3. **Discount**: Coupons provide a 10% discount on the entire order
 4. **Single Use**: Each coupon can only be used once
 5. **Invalidation**: Coupons become invalid immediately after use
-6. **Deterministic**: Coupon codes are generated deterministically (same order count = same code)
+6. **Sliding Window**: When a coupon is used, the counter resets and the next coupon becomes available on the 4th order from that point
+7. **Deterministic**: Coupon codes are generated deterministically (same order count = same code)
 
 ### Coupon Code Format
 
@@ -70,14 +72,16 @@ Coupons follow the format: `SAVE10-XXXX` where `XXXX` is a 4-character alphanume
 
 ### Example Flow
 
-1. User places orders 1-4: No coupon generated
-2. User places order 5: New coupon `SAVE10-AB12` is generated and becomes active
-3. User places order 6 with coupon `SAVE10-AB12`: 
+1. User places orders 1-3: No coupon generated
+2. User places order 4: New coupon `SAVE10-AB12` is generated and becomes active
+3. User places order 5 with coupon `SAVE10-AB12`: 
    - Coupon is validated and applied (10% discount)
    - Coupon is marked as used/invalid
+   - Counter resets to 0
    - Order is created
-4. User places orders 7-9: No coupon available
-5. User places order 10: New coupon `SAVE10-CD34` is generated
+4. User places orders 6-8: No coupon available (counter: 1, 2, 3)
+5. User places order 9: New coupon `SAVE10-CD34` is generated (counter reaches 4)
+6. If coupon from order 4 is not used, it remains available for subsequent orders until used
 
 ## Getting Started
 
@@ -230,6 +234,31 @@ Process checkout and create an order.
 }
 ```
 
+### Coupon Endpoints
+
+#### GET /coupon/active
+
+Get the currently active coupon code (if any).
+
+**Response:**
+```json
+{
+  "coupon": {
+    "code": "SAVE10-AB12",
+    "discountPercent": 10,
+    "createdAt": "2024-01-01T12:00:00.000Z",
+    "isValid": true
+  }
+}
+```
+
+Or if no active coupon exists:
+```json
+{
+  "coupon": null
+}
+```
+
 ### Admin Endpoints
 
 #### GET /admin/stats
@@ -290,6 +319,7 @@ Check server health.
 - ✅ Browse products
 - ✅ Add items to cart
 - ✅ View cart with product details
+- ✅ Request active coupon code
 - ✅ Apply coupon codes at checkout
 - ✅ Complete checkout process
 - ✅ User ID simulation (change userId in navigation)
@@ -305,10 +335,11 @@ Check server health.
 
 ### Business Logic
 
-- ✅ Automatic coupon generation every 3rd order
+- ✅ Automatic coupon generation every 4th order
 - ✅ Single active coupon at a time
 - ✅ Coupon validation and application
 - ✅ Automatic coupon invalidation after use
+- ✅ Sliding window: Counter resets when coupon is used
 - ✅ Deterministic coupon code generation
 
 ## Testing
@@ -343,7 +374,7 @@ This mirrors how production teams enforce quality gates.
 - **Architecture**: Clean architecture with separation of concerns
 
 ### Frontend
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **State Management**: React Context API
